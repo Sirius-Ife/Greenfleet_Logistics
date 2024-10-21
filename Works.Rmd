@@ -1,0 +1,191 @@
+---
+title: "greenfleet_logistics"
+author: "Ife Abe"
+date: "2024-10-20"
+output: html_document
+---
+
+# Introduction
+
+  This project analyzes the potential benefits of transitioning GreenFleet Logistics' truck fleet from diesel to electric vehicles. With a fleet of 100 trucks, comprising 70 diesel and 30 electric, we will evaluate the operational costs, maintenance expenses, and environmental impacts associated with each vehicle type.
+
+Using R for calculations, we will:
+
+- Calculate the total annual costs for both diesel and electric trucks, considering factors such as fuel efficiency, maintenance costs, and initial investments.
+- Compare these costs to determine potential savings from switching entirely to electric trucks.
+
+The goal is to provide insights into the financial viability of this transition, supporting GreenFleet's commitment to sustainability and operational efficiency.
+
+
+```{r 1,message=FALSE,warning=FALSE}
+
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+
+# Constants
+diesel_price <- 4           # Price per gallon
+electricity_price <- 0.10   # Price per kWh
+annual_mileage <- 50000     # Mileage per truck
+years <- 10                 # Set the analysis period
+discount_rate <- 0.05       # Discount rate for NPV calculation
+
+# Diesel Truck Data
+diesel_trucks <- list(
+  quantity = 70,
+  maintenance_cost = 12000,
+  fuel_efficiency = 6,      # miles per gallon
+  purchase_price = 80000
+)
+
+# Electric Truck Data
+electric_trucks <- list(
+  quantity = 30,
+  maintenance_cost = 8000,
+  energy_efficiency = 2,    # miles per kWh
+  purchase_price = 120000
+)
+
+# Calculate Diesel and Electric Annual Costs
+diesel_fuel_cost_per_truck <- (annual_mileage / diesel_trucks$fuel_efficiency) * diesel_price
+total_diesel_fuel_cost <- diesel_fuel_cost_per_truck * diesel_trucks$quantity
+total_diesel_annual_cost <- total_diesel_fuel_cost + (diesel_trucks$maintenance_cost * diesel_trucks$quantity)
+
+electric_energy_consumption_per_truck <- annual_mileage / electric_trucks$energy_efficiency
+charging_cost_per_truck <- electric_energy_consumption_per_truck * electricity_price
+total_electric_charging_cost <- charging_cost_per_truck * electric_trucks$quantity
+total_electric_annual_cost <- total_electric_charging_cost + (electric_trucks$maintenance_cost * electric_trucks$quantity)
+
+initial_investment <- (electric_trucks$purchase_price * electric_trucks$quantity) - (diesel_trucks$purchase_price * diesel_trucks$quantity)
+
+annual_savings <- total_diesel_annual_cost - total_electric_annual_cost
+
+# Output Results
+total_diesel_annual_cost
+total_electric_annual_cost
+initial_investment 
+annual_savings
+
+```
+
+## Net Present Value (NPV) Calculation
+  The NPV function computes the present value of cash flows over 10 years, accounting for the initial investment in electric trucks and the resulting annual savings.
+
+```{r 2,}
+
+npv <- function(cash_flows, discount_rate) {
+  sum(cash_flows / (1 + discount_rate)^(0:(length(cash_flows)-1)))
+}
+
+# Cash flows over the analysis period
+cash_flows <- rep(annual_savings, years)
+cash_flows[1] <- cash_flows[1] - initial_investment  # Include initial investment in the first year
+
+npv_result <- npv(cash_flows, discount_rate)
+
+npv_result
+
+```
+
+## Break-Even Analysis
+  The code identifies the year in which cumulative savings from operating electric trucks surpass the initial investment, indicating that the switch becomes financially beneficial within the first year of operation. This means that GreenFleet Logistics will recoup its initial investment through savings generated from lower operational costs almost immediately.
+   
+```{r 3,}
+
+break_even_years <- which(cumsum(rep(annual_savings, years)) >= initial_investment)[1]  # First year when cumulative savings exceed investment
+
+```
+
+## Scenario Analysis
+  This part of the code tests different diesel price scenarios to observe how fluctuating prices impact the annual savings from electric trucks.
+
+```{r 4,}
+# Scenario Analysis (example: fluctuating diesel prices)
+scenario_results <- data.frame()
+for (price in seq(3, 5, by = 0.5)) {
+  diesel_price <- price
+  diesel_fuel_cost_per_truck <- (annual_mileage / diesel_trucks$fuel_efficiency) * diesel_price
+  total_diesel_fuel_cost <- diesel_fuel_cost_per_truck * diesel_trucks$quantity
+  total_diesel_annual_cost <- total_diesel_fuel_cost + (diesel_trucks$maintenance_cost * diesel_trucks$quantity)
+  
+  annual_savings <- total_diesel_annual_cost - total_electric_annual_cost
+  scenario_results <- rbind(scenario_results, data.frame(diesel_price = price, annual_savings = annual_savings))
+}
+
+annual_savings
+
+```
+
+## Visualization:
+  Using the `ggplot2` library, we create visualizations comparing annual costs between diesel and electric trucks and a bar chart representing the NPV of switching to electric vehicles.
+
+```{r 5,}
+# Visualization of Cost Comparison and Savings
+cost_data <- data.frame(
+  Year = 1:years,
+  DieselCost = rep(total_diesel_annual_cost, years),
+  ElectricCost = rep(total_electric_annual_cost, years)
+)
+
+ggplot(cost_data, aes(x = Year)) +
+  geom_line(aes(y = DieselCost, color = "Diesel Trucks"), linewidth = 1) +  # Use linewidth instead of size
+  geom_line(aes(y = ElectricCost, color = "Electric Trucks"), linewidth = 1) +  # Use linewidth instead of size
+  labs(title = "Annual Cost Comparison of Diesel vs. Electric Trucks",
+       x = "Year",
+       y = "Annual Cost ($)",
+       color = "Truck Type") +
+  theme_minimal()
+
+```
+
+## Emission Reductions Visualization:
+  The bar chart compares the annual emissions of diesel and electric trucks, highlighting the significant reduction in emissions achieved by switching to electric vehicles.
+
+```{r 6,}
+
+# Emission Data
+diesel_emission_rate <- 10  # tons CO2 per truck per year
+electric_emission_rate <- 0  # electric trucks are assumed to have zero emissions
+
+# Create a data frame for emissions
+emission_data <- data.frame(
+  Truck_Type = c("Diesel Trucks", "Electric Trucks"),
+  Annual_Emissions = c(diesel_emission_rate * diesel_trucks$quantity, electric_emission_rate * electric_trucks$quantity)
+)
+
+# Visualization of Emission Reductions
+ggplot(emission_data, aes(x = Truck_Type, y = Annual_Emissions, fill = Truck_Type)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Annual Emission Reductions from Switching to Electric Trucks",
+       x = "Truck Type",
+       y = "Annual Emissions (tons CO2)") +
+  theme_minimal() +
+  scale_fill_manual(values = c("steelblue", "forestgreen"))
+
+```
+
+## Total Savings and Break-Even Point Visualization:
+
+  The line chart shows cumulative savings over time, with a dashed line indicating the break-even point (where cumulative savings equal zero). A green point marks the exact year when savings surpass the initial investment.
+
+```{r 7,message=FALSE,warning=FALSE}
+
+# Create a data frame for cumulative savings over years
+cumulative_savings <- cumsum(rep(annual_savings, years)) - initial_investment  # Adjust first year for initial investment
+cumulative_data <- data.frame(
+  Year = 1:years,
+  Cumulative_Savings = cumulative_savings
+)
+
+# Visualization of Total Savings and Break-Even Point
+ggplot(cumulative_data, aes(x = Year, y = Cumulative_Savings)) +
+  geom_line(color = "steelblue", size = 1) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  geom_point(data = cumulative_data[cumulative_data$Cumulative_Savings >= 0, ][1, ], aes(x = Year, y = Cumulative_Savings), color = "green", size = 3) +
+  labs(title = "Cumulative Savings from Switching to Electric Trucks",
+       x = "Year",
+       y = "Cumulative Savings ($)") +
+  theme_minimal() +
+  annotate("text", x = 1, y = max(cumulative_data$Cumulative_Savings) * 0.1, label = "Break-Even Point", color = "green", hjust = 0)
+
+```
